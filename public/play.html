@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>Dashers</title>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<div class="wrap">
+  <h1 class="logo">D<em>A</em>SHERS</h1>
+  <div class="sub" id="sub">connecting…</div>
+  <div id="view"></div>
+  <div class="foot" id="foot"></div>
+</div>
+
+<script>
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const view = document.getElementById('view');
+const sub  = document.getElementById('sub');
+const foot = document.getElementById('foot');
+
+const params  = new URLSearchParams(location.search);
+const urlCode = (params.get('c') || '').toUpperCase();
+let ws, ST = null, me = null, err = '', joined = false;
+
+/* -------------------------------------------------------------- transport */
+function connect(){
+  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
+  ws.onopen = () => {
+    const s = JSON.parse(localStorage.getItem('dashers_seat') || 'null');
+    if (s && (!urlCode || s.code === urlCode)) send({ t:'join', code: s.code, pid: s.pid });
+    else renderJoin();
+  };
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.t === 'joined') {
+      joined = true; me = m;
+      localStorage.setItem('dashers_seat', JSON.stringify({ code: m.code, pid: m.pid, name: m.name }));
+      return;
+    }
+    if (m.t === 'error') {
+      err = m.msg;
+      if (/No game|ended|under way/i.test(m.msg) && !joined) { localStorage.removeItem('dashers_seat'); renderJoin(); }
+      else if (ST) render();
+      return;
+    }
+    if (m.t === 'state') { err = ''; ST = m; joined = true; render(); }
+  };
+  ws.onclose = () => { sub.textContent = 'reconnecting…'; setTimeout(connect, 1200); };
+}
+const send = o => ws && ws.readyState === 1 && ws.send(JSON.stringify(o));
+connect();
+
+/* ------------------------------------------------------------- join screen */
+function renderJoin(){
+  joined = false;
+  sub.textContent = 'take a seat';
+  foot.textContent = '';
+  const saved = JSON.parse(localStorage.getItem('dashers_seat') || 'null');
+  view.innerHTML = `
+    <div class="paper">
+      <div class="eyebrow">Game code</div>
+      <input type="text" class="code-in" id="code" maxlength="4" placeholder="CODE"
+             autocomplete="off" autocapitalize="characters" value="${esc(urlCode)}">
+      <div style="height:18px"></div>
+      <div class="eyebrow">Your name</div>
+      <input type="text" id="name" maxlength="14" placeholder="e.g. Georgie" autocomplete="off"
+             value="${esc(saved && saved.name ? saved.name : '')}">
+      <div class="warn" id="warn">${esc(err)}</div>
+    </div>
+    <button class="wide gold" id="join">Sit down</button>`;
+  const go = () => {
+    const c = document.getElementById('code').value.trim().toUpperCase();
+    const n = document.getElementById('name').value.trim();
+    if (c.length !== 4) return document.getElementById('warn').textContent = 'The code is four letters.';
+    if (!n) return document.getElementById('warn').textContent = 'Pick a name.';
+    send({ t:'join', code: c, name: n });
+  };
+  document.getElementById('join').onclick = go;
+  document.getElementById('name').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+  if (urlCode) document.getElementById('name').focus();
+}
+
+/* ---------------------------------------------------------------- helpers */
+function promptCard(showTask){
+  return `<div class="promptcard">
+    <div class="cat">${esc(ST.category ? ST.category.name : '')}</div>
+    <div class="txt">${esc(ST.prompt || '')}</div>
+    ${showTask && ST.category ? `<div class="task">${esc(ST.category.task)}</div>` : ''}
+  </div>`;
+}
+function panel(title, line, extra = ''){
+  return `<div class="paper" style="text-align:center;padding:40px 22px">
+    <div class="big">${title}</div><div class="mid">${line}</div>${extra}</div>`;
+}
+const warnBox = () => `<div class="warn" id="warn">${esc(err)}</div>`;
+
+/* ----------------------------------------------------------------- render */
+function render(){
+  if (!ST || !ST.you) return;
+  const Y = ST.you;
+  foot.textContent = ST.phase === 'lobby' ? `code ${ST.code}` : `round ${ST.round} · ${Y.score} pts`;
+
+  switch (ST.phase) {
+
+    case 'lobby':
+      sub.textContent = `you're in as ${Y.name}`;
+      view.innerHTML = `
+        ${panel('Seated', 'Waiting for the board to deal.')}
+        <div class="paper tight">
+          <div class="eyebrow">At the table — ${ST.players.length}</div>
+          <div class="tokens">${ST.players.map(p =>
+            `<div class="token ${p.connected ? '' : 'away'}"><span class="dot"></span>${esc(p.name)}</div>`).join('')}</div>
+        </div>`;
+      return;
+
+    /* ---------------- Dasher chooses a category ---------------- */
+    case 'choose':
+      if (!Y.isDasher) {
+        sub.textContent = 'sit tight';
+        view.innerHTML = panel(`${esc(ST.dasherName)} is the Dasher`, 'Choosing a category…');
+        return;
+      }
+      sub.textContent = 'you are the dasher';
+      view.innerHTML = `
+        <div class="paper">
+          <div class="eyebrow">Pick a category</div>
+          <div class="cats">${ST.categories.map(c =>
+            `<button class="cat-btn" data-c="${c.key}"><b>${esc(c.name)}</b><i>${esc(c.blurb)}</i></button>`).join('')}</div>
+          <div class="hint">You'll see the card and its real answer before you commit.</div>
+        </div>`;
+      view.querySelectorAll('[data-c]').forEach(b => b.onclick = () => send({ t:'pick_cat', cat: b.dataset.c }));
+      return;
+
+    /* ---------------- Dasher previews the card + answer ---------------- */
+    case 'preview':
+      if (!Y.isDasher) {
+        sub.textContent = 'sit tight';
+        view.innerHTML = panel(`${esc(ST.dasherName)} has a card`, 'Sizing it up…');
+        return;
+      }
+      sub.textContent = 'for your eyes only';
+      view.innerHTML = `
+        <div class="promptcard">
+          <div class="cat">${esc(ST.category.name)}</div>
+          <div class="txt">${esc(ST.preview.prompt)}</div>
+          <div class="task">${esc(ST.category.task)}</div>
+        </div>
+        <div class="paper plain">
+          <div class="secret">
+            <div class="lab">The real answer — keep it to yourself</div>
+            <div class="val">${esc(ST.preview.answer)}</div>
+          </div>
+          <div class="hint">Too easy? Too obscure? Swap it before you commit.</div>
+          <div style="height:14px"></div>
+          <div class="row">
+            <button class="ghost sm" id="back">&larr; Category</button>
+            <button class="ghost sm" id="redraw">Another card</button>
+          </div>
+        </div>
+        <button class="wide gold" id="lock">Lock it in &amp; collect answers</button>`;
+      document.getElementById('back').onclick   = () => send({ t:'back' });
+      document.getElementById('redraw').onclick = () => send({ t:'redraw' });
+      document.getElementById('lock').onclick   = () => send({ t:'lock' });
+      return;
+
+    /* ---------------- everyone writes a bluff ---------------- */
+    case 'write': {
+      const done = ST.players.filter(p => p.submitted).length;
+      if (Y.isDasher) {
+        sub.textContent = 'read the card aloud';
+        view.innerHTML = promptCard(true)
+          + panel('Read it to the table', 'Then wait for the lies to come in.',
+                  `<div class="count" style="margin-top:14px">${done} / ${ST.needed}</div>`);
+        return;
+      }
+      if (Y.submitted) {
+        sub.textContent = 'locked in';
+        view.innerHTML = panel('Your lie is in', `Waiting on the others — ${done} of ${ST.needed}.`);
+        return;
+      }
+      sub.textContent = 'make it convincing';
+      view.innerHTML = promptCard(true) + `
+        <div class="paper">
+          <div class="eyebrow">${esc(ST.category.task)}</div>
+          <input type="text" id="bluff" maxlength="160" placeholder="Your convincing lie…" autocomplete="off">
+          ${warnBox()}
+        </div>
+        <button class="wide gold" id="sub">Submit</button>`;
+      const go = () => { const v = document.getElementById('bluff').value; if (v.trim().length >= 2) send({ t:'submit', text:v }); };
+      document.getElementById('sub').onclick = go;
+      document.getElementById('bluff').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+      setTimeout(() => { const el = document.getElementById('bluff'); if (el) el.focus(); }, 60);
+      return;
+    }
+
+    /* ---------------- Dasher reads them out ---------------- */
+    case 'read': {
+      const slips = `<ol class="slips">${ST.pool.map(a => `<li>${esc(a.text)}</li>`).join('')}</ol>`;
+      if (Y.isDasher) {
+        sub.textContent = 'read each one aloud';
+        const last = ST.revealed >= ST.poolSize;
+        view.innerHTML = promptCard(false) + `
+          <div class="paper">
+            <div class="eyebrow">Revealed ${ST.revealed} of ${ST.poolSize}</div>
+            ${ST.revealed ? slips : '<div class="mid">Tap below and read the first one out.</div>'}
+          </div>
+          <button class="wide gold" id="nx">${last ? 'Open the vote' : 'Reveal answer ' + (ST.revealed + 1)}</button>`;
+        document.getElementById('nx').onclick = () => send({ t:'reveal_next' });
+        return;
+      }
+      sub.textContent = 'listen carefully';
+      view.innerHTML = promptCard(false) + `
+        <div class="paper">
+          <div class="eyebrow">${esc(ST.dasherName)} is reading — ${ST.revealed} of ${ST.poolSize}</div>
+          ${ST.revealed ? slips : '<div class="mid">Waiting…</div>'}
+        </div>`;
+      return;
+    }
+
+    /* ---------------- voting ---------------- */
+    case 'vote': {
+      const v = ST.players.filter(p => p.voted).length;
+      if (Y.isDasher) {
+        sub.textContent = 'the table decides';
+        view.innerHTML = promptCard(false)
+          + panel('Votes coming in', 'You sit this one out.',
+                  `<div class="count" style="margin-top:14px">${v} / ${ST.needed}</div>`);
+        return;
+      }
+      if (Y.vote != null) {
+        sub.textContent = 'vote cast';
+        view.innerHTML = promptCard(false) + `
+          <div class="paper">
+            <div class="eyebrow">You chose</div>
+            <ol class="slips">${ST.pool.map((a, i) =>
+              `<li class="${i === Y.vote ? 'chosen' : ''}" style="${i === Y.vote ? '' : 'opacity:.35'}">${esc(a.text)}</li>`).join('')}</ol>
+            <div class="rule"><span>${v} of ${ST.needed} voted</span></div>
+          </div>`;
+        return;
+      }
+      sub.textContent = 'which one is real?';
+      view.innerHTML = promptCard(false) + `
+        <div class="paper">
+          <div class="eyebrow">Tap the one you believe</div>
+          <ol class="slips">${ST.pool.map((a, i) => {
+            const mine = i === Y.myPoolIndex;
+            return `<li class="${mine ? 'mine' : 'pick'}" data-i="${i}">${esc(a.text)}
+              ${mine ? '<span class="meta">your lie</span>' : ''}</li>`;
+          }).join('')}</ol>
+          ${warnBox()}
+        </div>`;
+      view.querySelectorAll('.pick').forEach(li => li.onclick = () => send({ t:'vote', i:+li.dataset.i }));
+      return;
+    }
+
+    /* ---------------- reveal ---------------- */
+    case 'reveal': {
+      const R = ST.reveal;
+      const mine = R.scores.find(s => s.name === Y.name);
+      sub.textContent = 'the truth';
+      view.innerHTML = promptCard(false) + `
+        <div class="paper">
+          <div class="eyebrow">The truth</div>
+          <ol class="slips">${R.answers.map(a => `<li class="${a.real ? 'real' : ''}">${esc(a.text)}
+            <span class="meta">${a.real ? '<span class="truth">the real answer</span>'
+                                        : '<span class="who">' + esc(a.author) + '</span>'} ·
+            ${a.votes ? esc(a.voters.join(', ')) + ` (${a.votes})` : 'no votes'}</span></li>`).join('')}
+          </ol>
+        </div>
+        <div class="paper">
+          <div class="eyebrow">Most convincing lie</div>
+          <div class="podium">${
+            R.top3.length ? R.top3.map((a, i) => `<div class="pod">
+                <div class="rank">${['I','II','III'][i]}</div>
+                <div><div>${esc(a.text)}</div>
+                <div class="who">${a.votes} vote${a.votes === 1 ? '' : 's'} · ${a.real ? 'the real answer' : esc(a.author)}</div></div>
+              </div>`).join('')
+            : '<div class="mid">No votes were cast.</div>'}
+          </div>
+        </div>
+        <div class="paper">
+          <div class="eyebrow">Scores${mine && mine.delta ? ` — you took +${mine.delta}` : ''}</div>
+          <table>${R.scores.map(r =>
+            `<tr class="${r.isDasher ? 'dash' : ''}"><td>${esc(r.name)}</td>
+             <td class="d">${r.delta ? '+' + r.delta : ''}</td><td class="n">${r.score}</td></tr>`).join('')}</table>
+        </div>
+        ${Y.isDasher ? '<button class="wide gold" id="nr">Next round</button>'
+                     : '<div class="mid on-felt">Waiting for the next card…</div>'}`;
+      const b = document.getElementById('nr');
+      if (b) b.onclick = () => send({ t:'next_round' });
+      return;
+    }
+
+    /* ---------------- game over ---------------- */
+    case 'over': {
+      sub.textContent = 'final reckoning';
+      const top = ST.final[0].score;
+      const winners = ST.final.filter(p => p.score === top).map(p => p.name);
+      view.innerHTML = `
+        <div class="paper" style="text-align:center">
+          <div class="eyebrow" style="text-align:center">Champion liar</div>
+          <div class="big">${esc(winners.length > 1 ? winners.join(' & ') + ' — tied' : winners[0])}</div>
+          <div class="rule"><span>final scores</span></div>
+          <table>${ST.final.map(r =>
+            `<tr><td>${esc(r.name)}</td><td class="n">${r.score}</td></tr>`).join('')}</table>
+        </div>`;
+      return;
+    }
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Dashers</title>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<div class="wrap">
+  <h1 class="logo">D<em>A</em>SHERS</h1>
+  <div class="sub">a parlour game of plausible lies</div>
+
+  <div class="paper">
+    <div class="eyebrow">Set up the table</div>
+    <p style="margin:0 0 18px;color:var(--ink-soft);font-size:15px;line-height:1.6">
+      Open the <b style="color:var(--ink)">board</b> on a laptop or TV that everyone can see.
+      Each player joins from their own phone using the four-letter code.
+    </p>
+    <button class="wide gold" onclick="location.href='host.html'">Open the board</button>
+  </div>
+
+  <div class="rule"><span>or</span></div>
+
+  <div class="paper">
+    <div class="eyebrow">Join a game</div>
+    <input type="text" class="code-in" id="code" maxlength="4" placeholder="CODE" autocomplete="off" autocapitalize="characters">
+    <div style="height:14px"></div>
+    <button class="wide" id="go">Join on this device</button>
+  </div>
+
+  <div class="foot">up to 16 players</div>
+</div>
+<script>
+  const c = document.getElementById('code');
+  const go = () => { const v = c.value.trim().toUpperCase(); if (v.length === 4) location.href = 'play.html?c=' + v; };
+  document.getElementById('go').onclick = go;
+  c.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+</script>
+</body>
+</html>

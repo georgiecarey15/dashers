@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashers — the board</title>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<div class="wrap board">
+  <h1 class="logo">D<em>A</em>SHERS</h1>
+  <div class="sub" id="sub">shuffling…</div>
+  <div id="view"></div>
+  <div class="foot" id="foot"></div>
+</div>
+
+<script>
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const view = document.getElementById('view');
+const sub  = document.getElementById('sub');
+const foot = document.getElementById('foot');
+let ws, ST = null;
+
+/* -------------------------------------------------------------- transport */
+function connect(){
+  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
+  ws.onopen = () => {
+    const saved = sessionStorage.getItem('dashers_host_code');
+    if (saved) ws.send(JSON.stringify({ t:'host_rejoin', code: saved }));
+    else ws.send(JSON.stringify({ t:'host_create', origin: location.origin }));
+  };
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.t === 'error') {
+      if (/ended/i.test(m.msg)) { sessionStorage.removeItem('dashers_host_code');
+                                  ws.send(JSON.stringify({ t:'host_create', origin: location.origin })); }
+      return;
+    }
+    if (m.t !== 'state') return;
+    ST = m;
+    sessionStorage.setItem('dashers_host_code', m.code);
+    render();
+  };
+  ws.onclose = () => { sub.textContent = 'reconnecting…'; setTimeout(connect, 1200); };
+}
+const send = o => ws && ws.readyState === 1 && ws.send(JSON.stringify(o));
+connect();
+
+/* ---------------------------------------------------------------- helpers */
+function tokens(opts = {}){
+  return `<div class="tokens">` + ST.players.map(p => {
+    const done = (opts.mark === 'submitted' && p.submitted) || (opts.mark === 'voted' && p.voted);
+    const cls = ['token', p.connected ? '' : 'away', p.isDasher && opts.star ? 'dash' : '', done ? 'done' : ''].join(' ');
+    return `<div class="${cls}">${p.isDasher && opts.star ? '' : '<span class="dot"></span>'}${esc(p.name)}` +
+           (opts.scores ? ` &nbsp;<b>${p.score}</b>` : '') + `</div>`;
+  }).join('') + `</div>`;
+}
+function promptCard(){
+  return `<div class="promptcard">
+    <div class="cat">${esc(ST.category ? ST.category.name : '')}</div>
+    <div class="txt">${esc(ST.prompt || '')}</div>
+    ${ST.category ? `<div class="task">${esc(ST.category.task)}</div>` : ''}
+  </div>`;
+}
+function scoreTable(rows){
+  return `<table>` + rows.map(r =>
+    `<tr class="${r.isDasher ? 'dash' : ''}"><td>${esc(r.name)}</td>
+     <td class="d">${r.delta ? '+' + r.delta : ''}</td><td class="n">${r.score}</td></tr>`).join('') + `</table>`;
+}
+function waiting(title, line){
+  return `<div class="paper" style="text-align:center;padding:56px 24px">
+    <div class="big">${title}</div><div class="mid">${line}</div></div>`;
+}
+
+/* ----------------------------------------------------------------- render */
+function render(){
+  foot.textContent = ST.phase === 'lobby' ? 'up to 16 players'
+                   : `round ${ST.round} · code ${ST.code}`;
+
+  switch (ST.phase) {
+
+    case 'lobby': {
+      sub.textContent = 'gather round';
+      const enough = ST.players.length >= ST.minPlayers;
+      view.innerHTML = `
+        <div class="grid2">
+          <div class="paper" style="text-align:center">
+            <div class="eyebrow" style="text-align:center">Join at</div>
+            <div class="tiles">${ST.code.split('').map(l => `<div class="tile">${l}</div>`).join('')}</div>
+            <div class="rule"><span>on your phone</span></div>
+            <div class="qr">${ST.qr || ''}</div>
+            <div class="joinurl" style="color:var(--ink-soft)">${esc(ST.joinUrl)}</div>
+          </div>
+          <div>
+            <div class="paper">
+              <div class="eyebrow">At the table — ${ST.players.length}</div>
+              ${ST.players.length ? tokens() : '<div class="mid">Nobody yet.</div>'}
+            </div>
+            <div class="paper tight">
+              <div class="eyebrow">How to play</div>
+              <p style="margin:0;color:var(--ink-soft);font-size:14px;line-height:1.65">
+                Each round one player is the <b style="color:var(--ink)">Dasher</b>. They pick a category,
+                see the card and its true answer, then read the card aloud. Everyone else writes a convincing
+                lie. The truth is shuffled in, the Dasher reads the pile out, and the table votes.
+              </p>
+              <div class="rule"><span>scoring</span></div>
+              <p style="margin:0;color:var(--ink-soft);font-size:14px;line-height:1.7">
+                Finding the truth <b style="color:var(--crimson)">+2</b><br>
+                Each vote your lie steals <b style="color:var(--crimson)">+1</b><br>
+                Dasher, if nobody finds it <b style="color:var(--crimson)">+3</b>
+              </p>
+            </div>
+            <button class="wide gold" id="start" ${enough ? '' : 'disabled'}>
+              ${enough ? 'Deal the first card' : `Need ${ST.minPlayers - ST.players.length} more`}
+            </button>
+          </div>
+        </div>`;
+      const b = document.getElementById('start');
+      if (b) b.onclick = () => send({ t:'start' });
+      return;
+    }
+
+    case 'choose':
+      sub.textContent = 'the dasher is choosing';
+      view.innerHTML = waiting(`${esc(ST.dasherName)} is the Dasher`, 'Picking a category…')
+                     + `<div class="paper tight">${tokens({ star:true, scores:true })}</div>`;
+      return;
+
+    case 'preview':
+      sub.textContent = 'reading the card';
+      view.innerHTML = waiting(`${esc(ST.dasherName)} has a card`,
+        'Looking it over. Don\'t peek — they can see the real answer.')
+        + `<div class="paper tight">${tokens({ star:true, scores:true })}</div>`;
+      return;
+
+    case 'write': {
+      sub.textContent = 'write your lie';
+      const done = ST.players.filter(p => p.submitted).length;
+      view.innerHTML = promptCard() + `
+        <div class="paper">
+          <div class="eyebrow" style="text-align:center">Answers in</div>
+          <div class="count">${done} / ${ST.needed}</div>
+          <div class="rule"><span>${esc(ST.dasherName)} is the dasher</span></div>
+          ${tokens({ star:true, mark:'submitted' })}
+        </div>`;
+      return;
+    }
+
+    case 'read':
+      sub.textContent = 'read them out';
+      view.innerHTML = promptCard() + `
+        <div class="paper">
+          <div class="eyebrow">${esc(ST.dasherName)} is reading — ${ST.revealed} of ${ST.poolSize}</div>
+          <ol class="slips">${ST.pool.map(a => `<li>${esc(a.text)}</li>`).join('')}</ol>
+          ${ST.revealed === 0 ? '<div class="mid">…</div>' : ''}
+        </div>`;
+      return;
+
+    case 'vote': {
+      sub.textContent = 'cast your votes';
+      const v = ST.players.filter(p => p.voted).length;
+      view.innerHTML = promptCard() + `
+        <div class="paper">
+          <div class="eyebrow">Which one is real?</div>
+          <ol class="slips">${ST.pool.map(a => `<li>${esc(a.text)}</li>`).join('')}</ol>
+          <div class="rule"><span>votes in — ${v} of ${ST.needed}</span></div>
+          ${tokens({ star:true, mark:'voted' })}
+        </div>`;
+      return;
+    }
+
+    case 'reveal': {
+      sub.textContent = 'the truth';
+      const R = ST.reveal;
+      view.innerHTML = promptCard() + `
+        <div class="paper">
+          <div class="eyebrow">The truth</div>
+          <ol class="slips">${R.answers.map(a => `<li class="${a.real ? 'real' : ''}">${esc(a.text)}
+            <span class="meta">${a.real ? '<span class="truth">the real answer</span>'
+                                        : '<span class="who">' + esc(a.author) + '</span>'} ·
+            ${a.votes ? esc(a.voters.join(', ')) + ` (${a.votes})` : 'no votes'}</span></li>`).join('')}
+          </ol>
+        </div>
+        <div class="grid2">
+          <div class="paper">
+            <div class="eyebrow">Most convincing lie</div>
+            <div class="podium">${
+              R.top3.length ? R.top3.map((a, i) => `<div class="pod">
+                  <div class="rank">${['I','II','III'][i]}</div>
+                  <div><div>${esc(a.text)}</div>
+                  <div class="who">${a.votes} vote${a.votes === 1 ? '' : 's'} · ${a.real ? 'the real answer' : esc(a.author)}</div></div>
+                </div>`).join('')
+              : '<div class="mid">No votes were cast.</div>'}
+            </div>
+            ${R.nobodyFound ? `<div class="hint">Nobody found it — ${esc(ST.dasherName)} takes +3.</div>` : ''}
+          </div>
+          <div class="paper">
+            <div class="eyebrow">Scores</div>
+            ${scoreTable(R.scores)}
+          </div>
+        </div>
+        <div class="row">
+          <button class="ghost on-felt" id="end">End game</button>
+          <button class="gold" id="next">Next round</button>
+        </div>`;
+      document.getElementById('next').onclick = () => send({ t:'next_round' });
+      document.getElementById('end').onclick  = () => send({ t:'end_game' });
+      return;
+    }
+
+    case 'over': {
+      sub.textContent = 'final reckoning';
+      const top = ST.final[0].score;
+      const winners = ST.final.filter(p => p.score === top).map(p => p.name);
+      view.innerHTML = `
+        <div class="paper" style="text-align:center">
+          <div class="eyebrow" style="text-align:center">Champion liar</div>
+          <div class="big">${esc(winners.length > 1 ? winners.join(' & ') + ' — tied' : winners[0])}</div>
+          <div class="rule"><span>final scores</span></div>
+          ${scoreTable(ST.final)}
+        </div>
+        <button class="wide gold" id="again">Play again</button>`;
+      document.getElementById('again').onclick = () => send({ t:'play_again' });
+      return;
+    }
+  }
+}
+</script>
+</body>
+</html>

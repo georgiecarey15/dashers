@@ -1,0 +1,145 @@
+/* =========================================================================
+   DASHERS — card deck.  Every "answer" below is the genuine one.
+   Add your own by appending [prompt, real answer] pairs to any category.
+   ========================================================================= */
+
+const CATEGORIES = [
+  {key:"words",    name:"Words",              blurb:"An obscure real word",       task:"Invent its definition."},
+  {key:"initials", name:"Initials",           blurb:"A real abbreviation",        task:"Invent what it stands for."},
+  {key:"dates",    name:"Dates",              blurb:"A real date in history",     task:"Invent what happened."},
+  {key:"people",   name:"People",             blurb:"A real person",              task:"Invent what they're known for."},
+  {key:"movies",   name:"Movies",             blurb:"A real film title",          task:"Invent the plot."},
+  {key:"studies",  name:"Scientific Studies", blurb:"A real, unusual study",      task:"Invent its finding."},
+  {key:"business", name:"Bizarre Businesses", blurb:"A real or defunct company",  task:"Invent what it sells or does."}
+];
+
+const DECK = {
+words:[
+ ["BORBORYGMUS","The rumbling noise made by gas moving through the intestines."],
+ ["SNOLLYGOSTER","A shrewd, unprincipled person — especially a politician."],
+ ["GRIFFONAGE","Careless, illegible handwriting."],
+ ["ULOTRICHOUS","Having woolly or tightly curled hair."],
+ ["ZOANTHROPY","A delusion in which a person believes they have become an animal."],
+ ["CRAPULENCE","Sickness caused by excessive eating or drinking."],
+ ["MUNDIFY","To cleanse or purify."],
+ ["JENTACULAR","Relating to breakfast."],
+ ["GRIMTHORPE","To restore an old building badly — with too much money and too little taste."],
+ ["PSITHURISM","The sound of wind rustling through trees."],
+ ["MATUTOLYPEA","Ill humour on waking; getting out of bed on the wrong side."],
+ ["QUOMODOCUNQUIZE","To make money by any means possible."],
+ ["GARDYLOO","A warning cry once shouted before emptying a chamber pot from an upper window."],
+ ["TARANTISM","An urge to dance uncontrollably, once blamed on spider bites."],
+ ["VELLEITY","A wish so faint it produces no effort whatsoever."],
+ ["HIRQUITALLIENCE","The strength of a person's voice."]
+],
+initials:[
+ ["S.C.U.B.A.","Self-Contained Underwater Breathing Apparatus."],
+ ["L.A.S.E.R.","Light Amplification by Stimulated Emission of Radiation."],
+ ["T.A.S.E.R.","Thomas A. Swift's Electric Rifle — named after a boys' adventure novel."],
+ ["W.D.-40","Water Displacement, 40th formula — the 40th attempt was the one that worked."],
+ ["G.I.G.O.","Garbage In, Garbage Out."],
+ ["B.A.S.I.C.","Beginner's All-purpose Symbolic Instruction Code."],
+ ["CAPTCHA","Completely Automated Public Turing test to tell Computers and Humans Apart."],
+ ["Y.K.K. (on zips)","Yoshida Kogyo Kabushikigaisha — the Japanese firm that makes most of the world's zips."],
+ ["G.E.I.C.O.","Government Employees Insurance Company."],
+ ["I.K.E.A.","Ingvar Kamprad Elmtaryd Agunnaryd — the founder's name, his family farm and his home village."],
+ ["N.I.M.B.Y.","Not In My Back Yard."],
+ ["A.S.M.R.","Autonomous Sensory Meridian Response."],
+ ["S.O.N.A.R.","Sound Navigation and Ranging."],
+ ["Z.I.P. (as in ZIP code)","Zone Improvement Plan."],
+ ["P.I.N.","Personal Identification Number."],
+ ["N.A.S.D.A.Q.","National Association of Securities Dealers Automated Quotations."]
+],
+dates:[
+ ["26 June 1974","A barcode was scanned at a supermarket checkout for the first time — a pack of Wrigley's gum, in Troy, Ohio."],
+ ["1 April 1957","The BBC's Panorama broadcast the spaghetti-tree hoax, showing Swiss farmers harvesting pasta from trees."],
+ ["30 October 1938","Orson Welles broadcast 'The War of the Worlds' as a fake news bulletin."],
+ ["12 August 1981","IBM launched its first personal computer, the model 5150."],
+ ["6 May 1954","Roger Bannister ran the first sub-four-minute mile."],
+ ["23 October 2001","Apple unveiled the first iPod."],
+ ["4 February 2004","Facebook launched at Harvard."],
+ ["15 April 1955","Ray Kroc opened his first McDonald's franchise, in Des Plaines, Illinois."],
+ ["9 November 1965","The Northeast blackout cut power to around 30 million people across the US and Canada."],
+ ["20 January 1892","The first public game of basketball was played, in Springfield, Massachusetts."],
+ ["24 January 1984","Apple's Macintosh went on sale."],
+ ["3 December 1992","The first text message was sent. It said 'Merry Christmas'."],
+ ["11 November 1930","Albert Einstein and Leó Szilárd were granted a patent — for a refrigerator with no moving parts."],
+ ["18 July 1968","Intel was founded."],
+ ["7 April 1969","RFC 1 was published — the first of the open documents that the internet's standards are still written in today."],
+ ["22 November 1963","C.S. Lewis, Aldous Huxley and John F. Kennedy all died on the same day."]
+],
+people:[
+ ["Mary Anning","A self-taught fossil hunter who found the first correctly identified ichthyosaur skeleton, on the Dorset coast."],
+ ["Hedy Lamarr","A Hollywood film star who co-invented a frequency-hopping signalling system, an ancestor of Wi-Fi and Bluetooth."],
+ ["Stanislav Petrov","A Soviet officer who, in 1983, judged a nuclear missile alert to be a computer error and refused to escalate it."],
+ ["Percy Spencer","An engineer who invented the microwave oven after a chocolate bar melted in his pocket beside a radar set."],
+ ["Ignaz Semmelweis","A doctor who showed handwashing dramatically cut deaths in maternity wards — and was ridiculed for saying so."],
+ ["Tycho Brahe","A 16th-century astronomer who wore a metal prosthetic nose after a duel, and kept a pet elk."],
+ ["Lonnie Johnson","A NASA engineer who invented the Super Soaker water gun."],
+ ["Nikolai Vavilov","A botanist who built the world's first seed bank, then died of starvation in a Soviet prison."],
+ ["Shirley Chisholm","The first Black woman elected to the US Congress."],
+ ["Wojtek","A brown bear formally enlisted as a private in the Polish army in WWII, who carried crates of ammunition."],
+ ["Ada Lovelace","A 19th-century mathematician who wrote what is considered the first computer algorithm."],
+ ["Sarah Winchester","A rifle heiress who spent decades continuously building a mansion full of staircases that lead nowhere."],
+ ["Nellie Bly","A reporter who feigned insanity to expose a New York asylum from the inside, then travelled the world in 72 days."],
+ ["Chevalier de Saint-Georges","An 18th-century composer and champion fencer who conducted a Paris orchestra and led a Black regiment in the French Revolution."],
+ ["Grace Hopper","A naval officer and programmer who popularised the term 'debugging' and helped create the COBOL language."],
+ ["Roy Sullivan","A US park ranger recorded as having survived being struck by lightning seven times."]
+],
+movies:[
+ ["Zardoz (1974)","In 2293, a brutish exterminator discovers the giant flying stone head he worships is a fraud run by bored immortals."],
+ ["Ravenous (1999)","A remote US Army outpost in 1840s California is preyed on by a cannibal who gains strength from eating people."],
+ ["House / Hausu (1977)","A Japanese schoolgirl takes six friends to her aunt's country house, which devours them one by one."],
+ ["The Brood (1979)","A woman's experimental therapy causes her rage to physically manifest as murderous mutant children."],
+ ["Trog (1970)","An anthropologist studies a prehistoric ape-man discovered living in a cave in the English countryside."],
+ ["Gymkata (1985)","An American gymnast enters a lethal contest in a fictional country to win rights to a satellite base."],
+ ["The Wicker Man (1973)","A devoutly Christian policeman investigates a missing girl on a remote Scottish island of pagans."],
+ ["Riki-Oh: The Story of Ricky (1991)","A superhumanly strong prisoner tears his way through a corrupt privatised prison."],
+ ["Freaked (1993)","A vain actor is turned into a mutant by the owner of a roadside freak show."],
+ ["Sorry to Bother You (2018)","A Black telemarketer adopts a 'white voice', rises through a sinister corporation and uncovers its secret."],
+ ["Tetsuo: The Iron Man (1989)","A Japanese salaryman gradually and horrifyingly mutates into a mass of scrap metal."],
+ ["The Lure (2015)","Two mermaid sisters join a nightclub band in 1980s Warsaw — singing by night, eating men."],
+ ["Hundreds of Beavers (2022)","A near-silent black-and-white slapstick film in which a ruined applejack salesman becomes a fur trapper battling men in beaver costumes."],
+ ["Dead Alive / Braindead (1992)","A Sumatran rat-monkey bite turns a man's domineering mother into a zombie, and he hides the growing outbreak in his cellar."],
+ ["Being John Malkovich (1999)","An office worker finds a portal that lets him inhabit the actor John Malkovich's head for fifteen minutes."],
+ ["The Red Turtle (2016)","A wordless animated film about a man shipwrecked on an island, thwarted from leaving by a giant red turtle."]
+],
+studies:[
+ ["'Pigeons' discrimination of paintings by Monet and Picasso'","Pigeons learned to tell Monet paintings from Picasso ones — and correctly sorted works they had never seen before."],
+ ["'Fellatio by fruit bats prolongs copulation time'","Female short-nosed fruit bats that licked the male during mating stayed coupled significantly longer."],
+ ["'Chickens prefer beautiful humans'","Chickens trained on human faces pecked most at the same faces people rated attractive."],
+ ["'Walking with coffee: why does it spill?'","The rhythm of ordinary walking closely matches coffee's natural sloshing frequency, and the resonance tips it over the rim."],
+ ["'The nature of navel fluff'","Belly-button lint is clothing fibres scraped loose by abdominal hair and dragged inwards — usually greyish-blue."],
+ ["'Duration of urination does not change with body size'","Almost every mammal over about 3kg empties its bladder in roughly 21 seconds — cats and elephants alike."],
+ ["'On the rheology of cats'","Treated as a physics problem, cats can be described as a liquid: given time, they take the shape of any container."],
+ ["'Sword swallowing and its side effects'","Sword swallowers mostly suffer sore throats, and injure themselves more often when distracted or using several blades at once."],
+ ["'The effect of country music on suicide'","US cities with more country music airtime showed higher white suicide rates, the authors reported."],
+ ["'Pizza and risk of digestive tract cancers'","Italians who ate pizza regularly showed a lower risk of several digestive cancers."],
+ ["'On the comparative palatability of dry-season tadpoles from Costa Rica'","The researcher put tadpoles of different species in his own mouth and ranked how horrible each one tasted."],
+ ["'Do woodpeckers get headaches?'","No — their skulls have shock-absorbing adaptations that spare the brain from the impact."],
+ ["'Termination of intractable hiccups with digital rectal massage'","The hiccups stopped."],
+ ["'Are full or empty beer bottles sturdier?'","Empty bottles are sturdier, and either kind carries enough energy to fracture a human skull."],
+ ["'The effects of wearing wet underwear in the cold'","It made people considerably less comfortable, though it did not measurably change their core temperature."],
+ ["'Rectal foreign bodies: a case report'","A survey of objects removed from patients' rectums, which included a frozen pig's tail and a magazine."]
+],
+business:[
+ ["Rent-a-Chicken","Rents out live hens with a coop and feed for a season, so families can try keeping chickens before buying."],
+ ["Rent-a-Mourner","Supplied professional mourners, paid by the hour, to attend funerals and make them look better attended."],
+ ["LifeGem","Compressed the carbon from cremated human remains into synthetic memorial diamonds."],
+ ["Rock Bottom Productions (1975)","Sold the Pet Rock — an ordinary beach pebble in a box with air holes and a training manual."],
+ ["Lloyd Manufacturing Co. (1880s)","Sold cocaine-laced toothache drops, advertised as an instantaneous cure for children."],
+ ["Nokia (founded 1865)","Started as a wood-pulp mill making paper, later moving into rubber boots and tyres."],
+ ["Nintendo (founded 1889)","Started out making hanafuda — handmade Japanese playing cards."],
+ ["Wrigley (founded 1891)","Started by selling soap, then baking powder. The chewing gum was a free giveaway that outsold everything."],
+ ["Huff Daland Dusters","A crop-dusting outfit that sprayed pesticide on cotton fields — and later became Delta Air Lines."],
+ ["Samsung (founded 1938)","Began as a grocery trading company exporting dried fish, vegetables and noodles."],
+ ["Shell (founded 1833)","Began as a London shop selling seashells and oriental curiosities."],
+ ["Cuddle Up To Me","A shop selling booked, strictly platonic cuddling sessions by the hour."],
+ ["Berkshire Hathaway","Was a struggling New England textile mill before Warren Buffett took it over."],
+ ["Abercrombie & Fitch (founded 1892)","Began as an elite outfitter selling safari and expedition gear to explorers and presidents."],
+ ["Colgate (founded 1806)","Started out making soap, candles and starch. Toothpaste came more than sixty years later."],
+ ["Avon (founded 1886)","Began as a door-to-door book business, whose salesman gave away perfume samples that proved more popular than the books."]
+]
+};
+
+module.exports = { CATEGORIES, DECK };
