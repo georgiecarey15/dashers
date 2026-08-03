@@ -16,9 +16,11 @@
 
 <script>
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const view = document.getElementById('view');
-const sub  = document.getElementById('sub');
-const foot = document.getElementById('foot');
+/* Element handles are prefixed so they can never collide with an id used by
+   markup rendered later — that bug cost us a working Submit button once. */
+const elView = document.getElementById('view');
+const elSub  = document.getElementById('sub');
+const elFoot = document.getElementById('foot');
 
 const params  = new URLSearchParams(location.search);
 const urlCode = (params.get('c') || '').toUpperCase();
@@ -47,7 +49,7 @@ function connect(){
     }
     if (m.t === 'state') { err = ''; ST = m; joined = true; render(); }
   };
-  ws.onclose = () => { sub.textContent = 'reconnecting…'; setTimeout(connect, 1200); };
+  ws.onclose = () => { elSub.textContent = 'reconnecting…'; setTimeout(connect, 1200); };
 }
 const send = o => ws && ws.readyState === 1 && ws.send(JSON.stringify(o));
 connect();
@@ -55,10 +57,10 @@ connect();
 /* ------------------------------------------------------------- join screen */
 function renderJoin(){
   joined = false;
-  sub.textContent = 'take a seat';
-  foot.textContent = '';
+  elSub.textContent = 'take a seat';
+  elFoot.textContent = '';
   const saved = JSON.parse(localStorage.getItem('dashers_seat') || 'null');
-  view.innerHTML = `
+  elView.innerHTML = `
     <div class="paper">
       <div class="eyebrow">Game code</div>
       <input type="text" class="code-in" id="code" maxlength="4" placeholder="CODE"
@@ -87,7 +89,8 @@ function promptCard(showTask){
   return `<div class="promptcard">
     <div class="cat">${esc(ST.category ? ST.category.name : '')}</div>
     <div class="txt">${esc(ST.prompt || '')}</div>
-    ${showTask && ST.category ? `<div class="task">${esc(ST.category.task)}</div>` : ''}
+    ${showTask && ST.category ? `<div class="task">${esc(ST.category.task)}</div>
+      <div class="cardhelp">${esc(ST.category.help)}</div>` : ''}
   </div>`;
 }
 function panel(title, line, extra = ''){
@@ -100,13 +103,13 @@ const warnBox = () => `<div class="warn" id="warn">${esc(err)}</div>`;
 function render(){
   if (!ST || !ST.you) return;
   const Y = ST.you;
-  foot.textContent = ST.phase === 'lobby' ? `code ${ST.code}` : `round ${ST.round} · ${Y.score} pts`;
+  elFoot.textContent = ST.phase === 'lobby' ? `code ${ST.code}` : `round ${ST.round} · ${Y.score} pts`;
 
   switch (ST.phase) {
 
     case 'lobby':
-      sub.textContent = `you're in as ${Y.name}`;
-      view.innerHTML = `
+      elSub.textContent = `you're in as ${Y.name}`;
+      elView.innerHTML = `
         ${panel('Seated', 'Waiting for the board to deal.')}
         <div class="paper tight">
           <div class="eyebrow">At the table — ${ST.players.length}</div>
@@ -118,34 +121,35 @@ function render(){
     /* ---------------- Dasher chooses a category ---------------- */
     case 'choose':
       if (!Y.isDasher) {
-        sub.textContent = 'sit tight';
-        view.innerHTML = panel(`${esc(ST.dasherName)} is the Dasher`, 'Choosing a category…');
+        elSub.textContent = 'sit tight';
+        elView.innerHTML = panel(`${esc(ST.dasherName)} is the Dasher`, 'Choosing a category…');
         return;
       }
-      sub.textContent = 'you are the dasher';
-      view.innerHTML = `
+      elSub.textContent = 'you are the dasher';
+      elView.innerHTML = `
         <div class="paper">
           <div class="eyebrow">Pick a category</div>
           <div class="cats">${ST.categories.map(c =>
             `<button class="cat-btn" data-c="${c.key}"><b>${esc(c.name)}</b><i>${esc(c.blurb)}</i></button>`).join('')}</div>
           <div class="hint">You'll see the card and its real answer before you commit.</div>
         </div>`;
-      view.querySelectorAll('[data-c]').forEach(b => b.onclick = () => send({ t:'pick_cat', cat: b.dataset.c }));
+      elView.querySelectorAll('[data-c]').forEach(b => b.onclick = () => send({ t:'pick_cat', cat: b.dataset.c }));
       return;
 
     /* ---------------- Dasher previews the card + answer ---------------- */
     case 'preview':
       if (!Y.isDasher) {
-        sub.textContent = 'sit tight';
-        view.innerHTML = panel(`${esc(ST.dasherName)} has a card`, 'Sizing it up…');
+        elSub.textContent = 'sit tight';
+        elView.innerHTML = panel(`${esc(ST.dasherName)} has a card`, 'Sizing it up…');
         return;
       }
-      sub.textContent = 'for your eyes only';
-      view.innerHTML = `
+      elSub.textContent = 'for your eyes only';
+      elView.innerHTML = `
         <div class="promptcard">
           <div class="cat">${esc(ST.category.name)}</div>
           <div class="txt">${esc(ST.preview.prompt)}</div>
           <div class="task">${esc(ST.category.task)}</div>
+          <div class="cardhelp">${esc(ST.category.help)}</div>
         </div>
         <div class="paper plain">
           <div class="secret">
@@ -169,27 +173,29 @@ function render(){
     case 'write': {
       const done = ST.players.filter(p => p.submitted).length;
       if (Y.isDasher) {
-        sub.textContent = 'read the card aloud';
-        view.innerHTML = promptCard(true)
+        elSub.textContent = 'read the card aloud';
+        elView.innerHTML = promptCard(true)
           + panel('Read it to the table', 'Then wait for the lies to come in.',
                   `<div class="count" style="margin-top:14px">${done} / ${ST.needed}</div>`);
         return;
       }
       if (Y.submitted) {
-        sub.textContent = 'locked in';
-        view.innerHTML = panel('Your lie is in', `Waiting on the others — ${done} of ${ST.needed}.`);
+        elSub.textContent = 'locked in';
+        elView.innerHTML = panel('Your lie is in', `Waiting on the others — ${done} of ${ST.needed}.`);
         return;
       }
-      sub.textContent = 'make it convincing';
-      view.innerHTML = promptCard(true) + `
+      elSub.textContent = 'make it convincing';
+      elView.innerHTML = promptCard(true) + `
         <div class="paper">
           <div class="eyebrow">${esc(ST.category.task)}</div>
-          <input type="text" id="bluff" maxlength="160" placeholder="Your convincing lie…" autocomplete="off">
+          <input type="text" id="bluff" maxlength="160"
+                 placeholder="${esc(ST.category.hint)}" autocomplete="off"
+                 autocapitalize="sentences" enterkeyhint="send">
           ${warnBox()}
         </div>
-        <button class="wide gold" id="sub">Submit</button>`;
+        <button class="wide gold" id="submitBluff">Submit</button>`;
       const go = () => { const v = document.getElementById('bluff').value; if (v.trim().length >= 2) send({ t:'submit', text:v }); };
-      document.getElementById('sub').onclick = go;
+      document.getElementById('submitBluff').onclick = go;
       document.getElementById('bluff').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
       setTimeout(() => { const el = document.getElementById('bluff'); if (el) el.focus(); }, 60);
       return;
@@ -199,9 +205,9 @@ function render(){
     case 'read': {
       const slips = `<ol class="slips">${ST.pool.map(a => `<li>${esc(a.text)}</li>`).join('')}</ol>`;
       if (Y.isDasher) {
-        sub.textContent = 'read each one aloud';
+        elSub.textContent = 'read each one aloud';
         const last = ST.revealed >= ST.poolSize;
-        view.innerHTML = promptCard(false) + `
+        elView.innerHTML = promptCard(false) + `
           <div class="paper">
             <div class="eyebrow">Revealed ${ST.revealed} of ${ST.poolSize}</div>
             ${ST.revealed ? slips : '<div class="mid">Tap below and read the first one out.</div>'}
@@ -210,8 +216,8 @@ function render(){
         document.getElementById('nx').onclick = () => send({ t:'reveal_next' });
         return;
       }
-      sub.textContent = 'listen carefully';
-      view.innerHTML = promptCard(false) + `
+      elSub.textContent = 'listen carefully';
+      elView.innerHTML = promptCard(false) + `
         <div class="paper">
           <div class="eyebrow">${esc(ST.dasherName)} is reading — ${ST.revealed} of ${ST.poolSize}</div>
           ${ST.revealed ? slips : '<div class="mid">Waiting…</div>'}
@@ -223,15 +229,15 @@ function render(){
     case 'vote': {
       const v = ST.players.filter(p => p.voted).length;
       if (Y.isDasher) {
-        sub.textContent = 'the table decides';
-        view.innerHTML = promptCard(false)
+        elSub.textContent = 'the table decides';
+        elView.innerHTML = promptCard(false)
           + panel('Votes coming in', 'You sit this one out.',
                   `<div class="count" style="margin-top:14px">${v} / ${ST.needed}</div>`);
         return;
       }
       if (Y.vote != null) {
-        sub.textContent = 'vote cast';
-        view.innerHTML = promptCard(false) + `
+        elSub.textContent = 'vote cast';
+        elView.innerHTML = promptCard(false) + `
           <div class="paper">
             <div class="eyebrow">You chose</div>
             <ol class="slips">${ST.pool.map((a, i) =>
@@ -240,8 +246,8 @@ function render(){
           </div>`;
         return;
       }
-      sub.textContent = 'which one is real?';
-      view.innerHTML = promptCard(false) + `
+      elSub.textContent = 'which one is real?';
+      elView.innerHTML = promptCard(false) + `
         <div class="paper">
           <div class="eyebrow">Tap the one you believe</div>
           <ol class="slips">${ST.pool.map((a, i) => {
@@ -251,7 +257,7 @@ function render(){
           }).join('')}</ol>
           ${warnBox()}
         </div>`;
-      view.querySelectorAll('.pick').forEach(li => li.onclick = () => send({ t:'vote', i:+li.dataset.i }));
+      elView.querySelectorAll('.pick').forEach(li => li.onclick = () => send({ t:'vote', i:+li.dataset.i }));
       return;
     }
 
@@ -259,8 +265,8 @@ function render(){
     case 'reveal': {
       const R = ST.reveal;
       const mine = R.scores.find(s => s.name === Y.name);
-      sub.textContent = 'the truth';
-      view.innerHTML = promptCard(false) + `
+      elSub.textContent = 'the truth';
+      elView.innerHTML = promptCard(false) + `
         <div class="paper">
           <div class="eyebrow">The truth</div>
           <ol class="slips">${R.answers.map(a => `<li class="${a.real ? 'real' : ''}">${esc(a.text)}
@@ -295,10 +301,10 @@ function render(){
 
     /* ---------------- game over ---------------- */
     case 'over': {
-      sub.textContent = 'final reckoning';
+      elSub.textContent = 'final reckoning';
       const top = ST.final[0].score;
       const winners = ST.final.filter(p => p.score === top).map(p => p.name);
-      view.innerHTML = `
+      elView.innerHTML = `
         <div class="paper" style="text-align:center">
           <div class="eyebrow" style="text-align:center">Champion liar</div>
           <div class="big">${esc(winners.length > 1 ? winners.join(' & ') + ' — tied' : winners[0])}</div>

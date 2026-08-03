@@ -108,7 +108,8 @@ function publicState(room){
       voted: room.votes[p.id] != null
     })),
     dasherName: dasher(room) ? dasher(room).name : null,
-    category: cat ? { key: cat.key, name: cat.name, task: cat.task } : null,
+    category: cat ? { key: cat.key, name: cat.name, task: cat.task,
+                      help: cat.help, hint: cat.hint } : null,
     prompt: showPrompt && room.card ? room.card.prompt : null,
     pool: room.phase === 'read'
         ? room.pool.slice(0, room.revealed).map((a, i) => ({ i, text: a.text }))

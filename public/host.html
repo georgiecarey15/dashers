@@ -16,9 +16,9 @@
 
 <script>
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const view = document.getElementById('view');
-const sub  = document.getElementById('sub');
-const foot = document.getElementById('foot');
+const elView = document.getElementById('view');
+const elSub  = document.getElementById('sub');
+const elFoot = document.getElementById('foot');
 let ws, ST = null;
 
 /* -------------------------------------------------------------- transport */
@@ -41,7 +41,7 @@ function connect(){
     sessionStorage.setItem('dashers_host_code', m.code);
     render();
   };
-  ws.onclose = () => { sub.textContent = 'reconnecting…'; setTimeout(connect, 1200); };
+  ws.onclose = () => { elSub.textContent = 'reconnecting…'; setTimeout(connect, 1200); };
 }
 const send = o => ws && ws.readyState === 1 && ws.send(JSON.stringify(o));
 connect();
@@ -59,7 +59,8 @@ function promptCard(){
   return `<div class="promptcard">
     <div class="cat">${esc(ST.category ? ST.category.name : '')}</div>
     <div class="txt">${esc(ST.prompt || '')}</div>
-    ${ST.category ? `<div class="task">${esc(ST.category.task)}</div>` : ''}
+    ${ST.category ? `<div class="task">${esc(ST.category.task)}</div>
+      <div class="cardhelp">${esc(ST.category.help)}</div>` : ''}
   </div>`;
 }
 function scoreTable(rows){
@@ -74,15 +75,15 @@ function waiting(title, line){
 
 /* ----------------------------------------------------------------- render */
 function render(){
-  foot.textContent = ST.phase === 'lobby' ? 'up to 16 players'
+  elFoot.textContent = ST.phase === 'lobby' ? 'up to 16 players'
                    : `round ${ST.round} · code ${ST.code}`;
 
   switch (ST.phase) {
 
     case 'lobby': {
-      sub.textContent = 'gather round';
+      elSub.textContent = 'gather round';
       const enough = ST.players.length >= ST.minPlayers;
-      view.innerHTML = `
+      elView.innerHTML = `
         <div class="grid2">
           <div class="paper" style="text-align:center">
             <div class="eyebrow" style="text-align:center">Join at</div>
@@ -121,22 +122,22 @@ function render(){
     }
 
     case 'choose':
-      sub.textContent = 'the dasher is choosing';
-      view.innerHTML = waiting(`${esc(ST.dasherName)} is the Dasher`, 'Picking a category…')
+      elSub.textContent = 'the dasher is choosing';
+      elView.innerHTML = waiting(`${esc(ST.dasherName)} is the Dasher`, 'Picking a category…')
                      + `<div class="paper tight">${tokens({ star:true, scores:true })}</div>`;
       return;
 
     case 'preview':
-      sub.textContent = 'reading the card';
-      view.innerHTML = waiting(`${esc(ST.dasherName)} has a card`,
+      elSub.textContent = 'reading the card';
+      elView.innerHTML = waiting(`${esc(ST.dasherName)} has a card`,
         'Looking it over. Don\'t peek — they can see the real answer.')
         + `<div class="paper tight">${tokens({ star:true, scores:true })}</div>`;
       return;
 
     case 'write': {
-      sub.textContent = 'write your lie';
+      elSub.textContent = 'write your lie';
       const done = ST.players.filter(p => p.submitted).length;
-      view.innerHTML = promptCard() + `
+      elView.innerHTML = promptCard() + `
         <div class="paper">
           <div class="eyebrow" style="text-align:center">Answers in</div>
           <div class="count">${done} / ${ST.needed}</div>
@@ -147,8 +148,8 @@ function render(){
     }
 
     case 'read':
-      sub.textContent = 'read them out';
-      view.innerHTML = promptCard() + `
+      elSub.textContent = 'read them out';
+      elView.innerHTML = promptCard() + `
         <div class="paper">
           <div class="eyebrow">${esc(ST.dasherName)} is reading — ${ST.revealed} of ${ST.poolSize}</div>
           <ol class="slips">${ST.pool.map(a => `<li>${esc(a.text)}</li>`).join('')}</ol>
@@ -157,9 +158,9 @@ function render(){
       return;
 
     case 'vote': {
-      sub.textContent = 'cast your votes';
+      elSub.textContent = 'cast your votes';
       const v = ST.players.filter(p => p.voted).length;
-      view.innerHTML = promptCard() + `
+      elView.innerHTML = promptCard() + `
         <div class="paper">
           <div class="eyebrow">Which one is real?</div>
           <ol class="slips">${ST.pool.map(a => `<li>${esc(a.text)}</li>`).join('')}</ol>
@@ -170,9 +171,9 @@ function render(){
     }
 
     case 'reveal': {
-      sub.textContent = 'the truth';
+      elSub.textContent = 'the truth';
       const R = ST.reveal;
-      view.innerHTML = promptCard() + `
+      elView.innerHTML = promptCard() + `
         <div class="paper">
           <div class="eyebrow">The truth</div>
           <ol class="slips">${R.answers.map(a => `<li class="${a.real ? 'real' : ''}">${esc(a.text)}
@@ -209,10 +210,10 @@ function render(){
     }
 
     case 'over': {
-      sub.textContent = 'final reckoning';
+      elSub.textContent = 'final reckoning';
       const top = ST.final[0].score;
       const winners = ST.final.filter(p => p.score === top).map(p => p.name);
-      view.innerHTML = `
+      elView.innerHTML = `
         <div class="paper" style="text-align:center">
           <div class="eyebrow" style="text-align:center">Champion liar</div>
           <div class="big">${esc(winners.length > 1 ? winners.join(' & ') + ' — tied' : winners[0])}</div>

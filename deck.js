@@ -4,13 +4,40 @@
    ========================================================================= */
 
 const CATEGORIES = [
-  {key:"words",    name:"Words",              blurb:"An obscure real word",       task:"Invent its definition."},
-  {key:"initials", name:"Initials",           blurb:"A real abbreviation",        task:"Invent what it stands for."},
-  {key:"dates",    name:"Dates",              blurb:"A real date in history",     task:"Invent what happened."},
-  {key:"people",   name:"People",             blurb:"A real person",              task:"Invent what they're known for."},
-  {key:"movies",   name:"Movies",             blurb:"A real film title",          task:"Invent the plot."},
-  {key:"studies",  name:"Scientific Studies", blurb:"A real, unusual study",      task:"Invent its finding."},
-  {key:"business", name:"Bizarre Businesses", blurb:"A real or defunct company",  task:"Invent what it sells or does."}
+  { key:"words", name:"Words", blurb:"An obscure real word",
+    task:"Invent its definition",
+    help:"This is a real word from the dictionary — just a very obscure one. Write a definition convincing enough to pass for the real thing.",
+    hint:"A definition…" },
+
+  { key:"initials", name:"Initials", blurb:"A real abbreviation",
+    task:"Invent what it stands for",
+    help:"These are real initials that genuinely stand for something. Write what you reckon each letter stands for.",
+    hint:"It stands for…" },
+
+  { key:"dates", name:"Dates", blurb:"A real date in history",
+    task:"Invent what happened",
+    help:"Something genuinely notable happened on this date. Write an event convincing enough that people believe it.",
+    hint:"On this day…" },
+
+  { key:"people", name:"People", blurb:"A real person",
+    task:"Invent what they're known for",
+    help:"This is a real person who really existed. Write what they were famous for.",
+    hint:"They were the person who…" },
+
+  { key:"movies", name:"Movies", blurb:"A real film title",
+    task:"Invent the plot",
+    help:"This is a real film that genuinely exists. Write its plot in a sentence.",
+    hint:"The film in which…" },
+
+  { key:"studies", name:"Scientific Studies", blurb:"A real, unusual study",
+    task:"Invent what the researchers found",
+    help:"This is the title of a real scientific study that was actually carried out. Write what you think the researchers concluded.",
+    hint:"The researchers found that…" },
+
+  { key:"business", name:"Bizarre Businesses", blurb:"A real or defunct company",
+    task:"Invent what it sells or does",
+    help:"This is a real company — some still trading, some long gone. Write what it sells, or what it did.",
+    hint:"The company that…" }
 ];
 
 const DECK = {
