@@ -65,7 +65,7 @@ function makeRoom(){
     pool: [],                // {text, pid|null, real}
     votes: {},               // pid -> pool index
     revealed: 0,
-    revealData: null,
+    rev: null, revTimer: null,
     joinUrl: '',
     qr: '',
     touched: Date.now()
@@ -117,7 +117,7 @@ function publicState(room){
     revealed: room.revealed,
     poolSize: room.pool.length,
     needed: others(room).length,
-    reveal: room.phase === 'reveal' ? room.revealData : null,
+    reveal: room.phase === 'reveal' ? revealView(room) : null,
     final: room.phase === 'over'
         ? [...room.players].sort((a,b) => b.score - a.score).map(p => ({ name: p.name, score: p.score }))
         : null
@@ -154,7 +154,7 @@ function beginRound(room){
   room.round++;
   room.phase = 'choose';
   room.catKey = null; room.card = null;
-  room.subs = []; room.pool = []; room.votes = {}; room.revealed = 0; room.revealData = null;
+  room.subs = []; room.pool = []; room.votes = {}; room.revealed = 0; clearReveal(room); room.rev = null;
   broadcast(room);
 }
 function buildPool(room){
@@ -166,6 +166,66 @@ function buildPool(room){
   room.phase = 'read';
   broadcast(room);
 }
+/* ------------------------------------------------------ the drumroll reveal
+   The reveal is staged so it plays out rather than landing all at once:
+
+     stage 0        "the votes are in"      — suspense
+     stage 1..k     the k most-voted answers, counted down worst to best
+     stage k+1      the real answer
+     stage k+2      everything, with scores
+
+   Stages advance on a server timer so every screen stays in step. Nothing
+   identifying the real answer is put on the wire until its own stage, so
+   there is no peeking ahead in devtools.                                   */
+const STAGE_MS = { suspense: 2000, count: 2800, truth: 3400 };
+
+function revealView(room){
+  const R = room.rev;
+  if (!R) return null;
+  const k          = R.order.length;
+  const truthStage = k + 1;
+  const finalStage = k + 2;
+  const showTruth  = R.stage >= truthStage;
+  const showAll    = R.stage >= finalStage;
+
+  return {
+    stage: R.stage, truthStage, finalStage,
+    // counted down worst-placed first, so the biggest bluff lands last
+    // Authors are withheld during the countdown too: the real answer has no
+    // author, so naming everyone else's would point straight at it.
+    podium: R.order.slice(0, Math.min(R.stage, k)).map(a => ({
+      text: a.text, votes: a.votes, place: a.place,
+      author: showTruth ? a.author : null,
+      real:   showTruth ? a.real   : null
+    })),
+    truth:   showTruth ? { text: R.truth, author: R.truthVoters } : null,
+    answers: showAll ? R.answers : null,
+    scores:  showAll ? R.scores  : null,
+    nobodyFound: showTruth ? R.nobodyFound : null,
+    totalVotes: R.totalVotes
+  };
+}
+function clearReveal(room){
+  if (room.revTimer) { clearTimeout(room.revTimer); room.revTimer = null; }
+}
+function advanceReveal(room){
+  const R = room.rev;
+  if (!R) return;
+  const finalStage = R.order.length + 2;
+  if (R.stage >= finalStage) { clearReveal(room); return; }
+  R.stage++;
+  broadcast(room);
+  if (R.stage >= finalStage) { clearReveal(room); return; }
+  const next = R.stage >= R.order.length + 1 ? STAGE_MS.truth : STAGE_MS.count;
+  room.revTimer = setTimeout(() => advanceReveal(room), next);
+}
+function skipReveal(room){
+  if (!room.rev) return;
+  clearReveal(room);
+  room.rev.stage = room.rev.order.length + 2;
+  broadcast(room);
+}
+
 function tally(room){
   const counts = room.pool.map(() => 0);
   const voters = room.pool.map(() => []);
@@ -197,20 +257,28 @@ function tally(room){
     votes: counts[i],
     voters: voters[i]
   }));
-  room.revealData = {
+  const top3 = answers.map(a => ({ ...a }))
+                      .filter(a => a.votes > 0)
+                      .sort((x, y) => y.votes - x.votes)
+                      .slice(0, 3)
+                      .map((a, i) => ({ ...a, place: i + 1 }));
+
+  clearReveal(room);
+  room.rev = {
+    stage: 0,
+    order: top3.slice().reverse(),          // third place first, winner last
     answers,
     truth: room.card.answer,
+    truthVoters: voters[room.pool.findIndex(a => a.real)] || [],
     nobodyFound: !found,
-    top3: answers.map((a, i) => ({ ...a, i }))
-                 .filter(a => a.votes > 0)
-                 .sort((x, y) => y.votes - x.votes)
-                 .slice(0, 3),
+    totalVotes: Object.keys(room.votes).length,
     scores: [...room.players].sort((a,b) => b.score - a.score)
              .map(p => ({ name: p.name, score: p.score, delta: delta[p.id] || 0,
                           isDasher: !!dasher(room) && dasher(room).id === p.id }))
   };
   room.phase = 'reveal';
   broadcast(room);
+  room.revTimer = setTimeout(() => advanceReveal(room), STAGE_MS.suspense);
 }
 
 /* --------------------------------------------------------------- messaging */
@@ -361,23 +429,33 @@ wss.on('connection', ws => {
       }
 
       /* ---- move on ---- */
+      /* ---- cut the drumroll short ---- */
+      case 'skip_reveal': {
+        if (!room || room.phase !== 'reveal') return;
+        if (ws.role !== 'host' && !amDasher) return;
+        return skipReveal(room);
+      }
+
       case 'next_round': {
         if (!room || room.phase !== 'reveal') return;
         if (ws.role !== 'host' && !amDasher) return;
+        clearReveal(room);
         room.dasherIdx = (room.dasherIdx + 1) % room.players.length;
         return beginRound(room);
       }
       case 'end_game': {
         if (!room || ws.role !== 'host') return;
+        clearReveal(room);
         room.phase = 'over';
         return broadcast(room);
       }
       case 'play_again': {
         if (!room || ws.role !== 'host') return;
+        clearReveal(room);
         room.players.forEach(p => p.score = 0);
         CATEGORIES.forEach(c => room.used[c.key] = []);
         room.phase = 'lobby'; room.round = 0; room.dasherIdx = 0;
-        room.subs = []; room.pool = []; room.votes = {}; room.revealData = null;
+        room.subs = []; room.pool = []; room.votes = {}; room.rev = null;
         return broadcast(room);
       }
     }

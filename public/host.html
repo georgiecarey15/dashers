@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="theme.css">
 </head>
 <body>
+<div class="stitch"></div>
 <div class="wrap board">
   <h1 class="logo">D<em>A</em>SHERS</h1>
   <div class="sub" id="sub">shuffling…</div>
@@ -71,6 +72,65 @@ function scoreTable(rows){
 function waiting(title, line){
   return `<div class="paper" style="text-align:center;padding:56px 24px">
     <div class="big">${title}</div><div class="mid">${line}</div></div>`;
+}
+
+/* -------------------------------------------------- the staged reveal ----
+   Drawn straight from reveal.stage, so board and phones stay in lockstep. */
+const PLACE = ['1st','2nd','3rd'];
+function revealBody(R){
+  if (R.stage === 0) {
+    return `<div class="drumroll">
+      <div class="big">The votes are in</div>
+      <div class="mid">${R.totalVotes} vote${R.totalVotes === 1 ? '' : 's'} cast</div>
+      <div class="dots"><i></i><i></i><i></i></div>
+    </div>`;
+  }
+  let out = '';
+
+  if (R.podium.length) {
+    out += `<div class="paper">
+      <div class="eyebrow">${R.truth ? 'Most convincing' : 'Counting down the most convincing'}</div>
+      <div class="podium">` + R.podium.map(a => `
+        <div class="pod reveal-slot ${a.place === 1 ? 'first' : ''} ${a.real ? 'istruth' : ''}">
+          <div class="medal ${a.place === 2 ? 'm2' : a.place === 3 ? 'm3' : ''}">${PLACE[a.place - 1]}</div>
+          <div>
+            <div class="txt">${esc(a.text)}</div>
+            <div class="who">${a.votes} vote${a.votes === 1 ? '' : 's'}${
+              a.real === true ? ' · and it was the truth all along'
+              : a.author ? ' · ' + esc(a.author) + ' wrote that' : ''}</div>
+          </div>
+        </div>`).join('') + `</div></div>`;
+  }
+
+  if (R.truth) {
+    out += `<div class="truthcard">
+      <div class="stamp">True</div>
+      <div class="lab">The real answer</div>
+      <div class="val">${esc(R.truth.text)}</div>
+      <div class="who">${
+        R.truth.author.length
+          ? esc(R.truth.author.join(', ')) + (R.truth.author.length === 1 ? ' found it' : ' found it')
+          : 'Nobody found it'}</div>
+    </div>`;
+  }
+
+  if (R.answers) {
+    out += `<div class="grid2">
+      <div class="paper">
+        <div class="eyebrow">Every answer</div>
+        <ol class="slips">${R.answers.map(a => `<li class="${a.real ? 'real' : ''}">${esc(a.text)}
+          <span class="meta">${a.real ? '<span class="truth">the real answer</span>'
+                                      : '<span class="who">' + esc(a.author) + '</span>'} ·
+          ${a.votes ? esc(a.voters.join(', ')) + ` (${a.votes})` : 'no votes'}</span></li>`).join('')}
+        </ol>
+      </div>
+      <div class="paper">
+        <div class="eyebrow">Scores</div>
+        ${scoreTable(R.scores)}
+      </div>
+    </div>`;
+  }
+  return out;
 }
 
 /* ----------------------------------------------------------------- render */
@@ -171,41 +231,25 @@ function render(){
     }
 
     case 'reveal': {
-      elSub.textContent = 'the truth';
       const R = ST.reveal;
-      elView.innerHTML = promptCard() + `
-        <div class="paper">
-          <div class="eyebrow">The truth</div>
-          <ol class="slips">${R.answers.map(a => `<li class="${a.real ? 'real' : ''}">${esc(a.text)}
-            <span class="meta">${a.real ? '<span class="truth">the real answer</span>'
-                                        : '<span class="who">' + esc(a.author) + '</span>'} ·
-            ${a.votes ? esc(a.voters.join(', ')) + ` (${a.votes})` : 'no votes'}</span></li>`).join('')}
-          </ol>
-        </div>
-        <div class="grid2">
-          <div class="paper">
-            <div class="eyebrow">Most convincing lie</div>
-            <div class="podium">${
-              R.top3.length ? R.top3.map((a, i) => `<div class="pod">
-                  <div class="rank">${['I','II','III'][i]}</div>
-                  <div><div>${esc(a.text)}</div>
-                  <div class="who">${a.votes} vote${a.votes === 1 ? '' : 's'} · ${a.real ? 'the real answer' : esc(a.author)}</div></div>
-                </div>`).join('')
-              : '<div class="mid">No votes were cast.</div>'}
-            </div>
-            ${R.nobodyFound ? `<div class="hint">Nobody found it — ${esc(ST.dasherName)} takes +3.</div>` : ''}
-          </div>
-          <div class="paper">
-            <div class="eyebrow">Scores</div>
-            ${scoreTable(R.scores)}
-          </div>
-        </div>
-        <div class="row">
-          <button class="ghost on-felt" id="end">End game</button>
-          <button class="gold" id="next">Next round</button>
-        </div>`;
-      document.getElementById('next').onclick = () => send({ t:'next_round' });
-      document.getElementById('end').onclick  = () => send({ t:'end_game' });
+      const done = R.stage >= R.finalStage;
+      elSub.textContent = R.stage === 0 ? 'hold on…'
+                        : R.truth ? 'the truth' : 'counting down';
+      elView.innerHTML = promptCard() + revealBody(R) +
+        (R.nobodyFound ? `<div class="paper tight"><div class="mid">Nobody found it —
+           ${esc(ST.dasherName)} takes <b style="color:var(--crimson)">+3</b>.</div></div>` : '') +
+        (done
+          ? `<div class="row">
+               <button class="ghost on-felt" id="end">End game</button>
+               <button class="gold" id="next">Next round</button>
+             </div>`
+          : `<button class="ghost on-felt wide" id="skip">Skip the drumroll</button>`);
+      const next = document.getElementById('next');
+      if (next) next.onclick = () => send({ t:'next_round' });
+      const end = document.getElementById('end');
+      if (end) end.onclick = () => send({ t:'end_game' });
+      const skip = document.getElementById('skip');
+      if (skip) skip.onclick = () => send({ t:'skip_reveal' });
       return;
     }
 

@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="theme.css">
 </head>
 <body>
+<div class="stitch"></div>
 <div class="wrap">
   <h1 class="logo">D<em>A</em>SHERS</h1>
   <div class="sub" id="sub">connecting…</div>
@@ -98,6 +99,65 @@ function panel(title, line, extra = ''){
     <div class="big">${title}</div><div class="mid">${line}</div>${extra}</div>`;
 }
 const warnBox = () => `<div class="warn" id="warn">${esc(err)}</div>`;
+
+/* -------------------------------------------------- the staged reveal ----
+   Mirrors the board exactly, driven by reveal.stage from the server. */
+const PLACE = ['1st','2nd','3rd'];
+function revealBody(R, myName){
+  if (R.stage === 0) {
+    return `<div class="drumroll">
+      <div class="big">The votes are in</div>
+      <div class="mid">${R.totalVotes} vote${R.totalVotes === 1 ? '' : 's'} cast</div>
+      <div class="dots"><i></i><i></i><i></i></div>
+    </div>`;
+  }
+  let out = '';
+
+  if (R.podium.length) {
+    out += `<div class="paper">
+      <div class="eyebrow">${R.truth ? 'Most convincing' : 'Counting down the most convincing'}</div>
+      <div class="podium">` + R.podium.map(a => `
+        <div class="pod reveal-slot ${a.place === 1 ? 'first' : ''} ${a.real ? 'istruth' : ''}">
+          <div class="medal ${a.place === 2 ? 'm2' : a.place === 3 ? 'm3' : ''}">${PLACE[a.place - 1]}</div>
+          <div>
+            <div class="txt">${esc(a.text)}</div>
+            <div class="who">${a.votes} vote${a.votes === 1 ? '' : 's'}${
+              a.real === true ? ' · and it was the truth all along'
+              : a.author ? ' · ' + esc(a.author) + ' wrote that' : ''}</div>
+          </div>
+        </div>`).join('') + `</div></div>`;
+  }
+
+  if (R.truth) {
+    out += `<div class="truthcard">
+      <div class="stamp">True</div>
+      <div class="lab">The real answer</div>
+      <div class="val">${esc(R.truth.text)}</div>
+      <div class="who">${R.truth.author.length
+        ? esc(R.truth.author.join(', ')) + ' found it'
+        : 'Nobody found it'}</div>
+    </div>`;
+  }
+
+  if (R.answers) {
+    const mine = R.scores.find(s => s.name === myName);
+    out += `<div class="paper">
+        <div class="eyebrow">Every answer</div>
+        <ol class="slips">${R.answers.map(a => `<li class="${a.real ? 'real' : ''}">${esc(a.text)}
+          <span class="meta">${a.real ? '<span class="truth">the real answer</span>'
+                                      : '<span class="who">' + esc(a.author) + '</span>'} ·
+          ${a.votes ? esc(a.voters.join(', ')) + ` (${a.votes})` : 'no votes'}</span></li>`).join('')}
+        </ol>
+      </div>
+      <div class="paper">
+        <div class="eyebrow">Scores${mine && mine.delta ? ` — you took +${mine.delta}` : ''}</div>
+        <table>${R.scores.map(r =>
+          `<tr class="${r.isDasher ? 'dash' : ''}"><td>${esc(r.name)}</td>
+           <td class="d">${r.delta ? '+' + r.delta : ''}</td><td class="n">${r.score}</td></tr>`).join('')}</table>
+      </div>`;
+  }
+  return out;
+}
 
 /* ----------------------------------------------------------------- render */
 function render(){
@@ -264,38 +324,20 @@ function render(){
     /* ---------------- reveal ---------------- */
     case 'reveal': {
       const R = ST.reveal;
-      const mine = R.scores.find(s => s.name === Y.name);
-      elSub.textContent = 'the truth';
-      elView.innerHTML = promptCard(false) + `
-        <div class="paper">
-          <div class="eyebrow">The truth</div>
-          <ol class="slips">${R.answers.map(a => `<li class="${a.real ? 'real' : ''}">${esc(a.text)}
-            <span class="meta">${a.real ? '<span class="truth">the real answer</span>'
-                                        : '<span class="who">' + esc(a.author) + '</span>'} ·
-            ${a.votes ? esc(a.voters.join(', ')) + ` (${a.votes})` : 'no votes'}</span></li>`).join('')}
-          </ol>
-        </div>
-        <div class="paper">
-          <div class="eyebrow">Most convincing lie</div>
-          <div class="podium">${
-            R.top3.length ? R.top3.map((a, i) => `<div class="pod">
-                <div class="rank">${['I','II','III'][i]}</div>
-                <div><div>${esc(a.text)}</div>
-                <div class="who">${a.votes} vote${a.votes === 1 ? '' : 's'} · ${a.real ? 'the real answer' : esc(a.author)}</div></div>
-              </div>`).join('')
-            : '<div class="mid">No votes were cast.</div>'}
-          </div>
-        </div>
-        <div class="paper">
-          <div class="eyebrow">Scores${mine && mine.delta ? ` — you took +${mine.delta}` : ''}</div>
-          <table>${R.scores.map(r =>
-            `<tr class="${r.isDasher ? 'dash' : ''}"><td>${esc(r.name)}</td>
-             <td class="d">${r.delta ? '+' + r.delta : ''}</td><td class="n">${r.score}</td></tr>`).join('')}</table>
-        </div>
-        ${Y.isDasher ? '<button class="wide gold" id="nr">Next round</button>'
-                     : '<div class="mid on-felt">Waiting for the next card…</div>'}`;
+      const done = R.stage >= R.finalStage;
+      elSub.textContent = R.stage === 0 ? 'hold on…'
+                        : R.truth ? 'the truth' : 'counting down';
+      elView.innerHTML = promptCard(false) + revealBody(R, Y.name) +
+        (R.nobodyFound ? `<div class="paper tight"><div class="mid">Nobody found it —
+           ${esc(ST.dasherName)} takes <b style="color:var(--crimson)">+3</b>.</div></div>` : '') +
+        (Y.isDasher
+          ? (done ? '<button class="wide gold" id="nr">Next round</button>'
+                  : '<button class="wide ghost on-felt" id="skipr">Skip the drumroll</button>')
+          : (done ? '<div class="mid on-felt">Waiting for the next card…</div>' : ''));
       const b = document.getElementById('nr');
       if (b) b.onclick = () => send({ t:'next_round' });
+      const s = document.getElementById('skipr');
+      if (s) s.onclick = () => send({ t:'skip_reveal' });
       return;
     }
 

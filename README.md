@@ -55,7 +55,7 @@ can be anywhere.
 | **Write** | The Dasher reads the card aloud. Everyone else writes a convincing lie on their phone. |
 | **Read** | The real answer is shuffled into the pile. The Dasher taps through the answers one at a time, reading each aloud as it appears on the board and on every phone. |
 | **Vote** | Everyone but the Dasher votes for the answer they believe. You can't vote for your own. |
-| **Reveal** | The truth is highlighted, authors are named, the three most-voted answers get a podium, scores update. |
+| **Reveal** | Staged, so it plays out rather than landing all at once. "The votes are in", then the most-voted answers counted down worst to best, then the real answer, then the scores. The Dasher or the board can skip it. |
 
 ### Scoring
 
@@ -75,13 +75,24 @@ Everything lives in `deck.js` as `[prompt, real answer]` pairs. Append to any ca
 
 ```js
 words:[
- ["BORBORYGMUS","The rumbling noise made by gas moving through the intestines."],
+ ["BORBORYGMUS","The rumbling your stomach makes."],
  ["YOUR WORD","Your real definition."],          // ← add here
 ],
 ```
 
 Restart the server to pick up changes. Cards are drawn without repeats until a category is
 exhausted, then the category reshuffles.
+
+Two things make or break a card, and `npm test` checks both:
+
+**Make it obscure.** If a decent pub quiz team would get it, it's a weak card. The fun is
+nobody at the table having the faintest idea.
+
+**Write the real answer like a person.** This one is easy to miss. If every real answer is a
+tidy, complete, encyclopaedic sentence and every bluff is scrappy and human, the truth glows
+in the dark and the game stops working. So vary them — some three words, some rambling, some
+fragments, some starting with "No" or "It does". The deck test measures the spread of answer
+lengths and flags it if they all start to sound the same.
 
 ---
 

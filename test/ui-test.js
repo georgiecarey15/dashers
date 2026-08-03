@@ -171,19 +171,53 @@ const wrong = S(rest[1]).pool.findIndex((a,i) => i !== S(rest[1]).you.myPoolInde
 rest[1].window.document.querySelector(`li[data-i="${wrong}"]`).click();
 await waitFor(() => phaseOf(host) === 'reveal', 'reveal phase');
 
-/* ---------- reveal ---------- */
-console.log('\nREVEAL');
+/* ---------- reveal: the drumroll ---------- */
+console.log('\nTHE DRUMROLL');
+const seen = d => JSON.stringify(S(d)) + ' ' + txt(d);
+
+// stage 0 — suspense only, and the answer must not be anywhere on the wire yet
+ok('opens on a drumroll, not the answer', S(host).reveal.stage === 0);
+ok('drumroll is on screen', /votes are in/i.test(txt(host)));
+ok('THE TRUTH IS NOT LEAKED TO THE BOARD', !seen(host).includes(truth));
+ok('THE TRUTH IS NOT LEAKED TO PLAYERS', rest.every(p => !seen(p).includes(truth)));
+ok('no scores shown yet', S(host).reveal.scores === null);
+ok('no answer list shown yet', S(host).reveal.answers === null);
+
+const truthStage = S(host).reveal.truthStage;
+const finalStage = S(host).reveal.finalStage;
+ok('stages were planned', truthStage >= 1 && finalStage === truthStage + 1);
+
+// count down through the podium
+await waitFor(() => S(host).reveal.stage >= 1, 'first podium place', 9000);
+ok('podium starts counting down', S(host).reveal.podium.length >= 1);
+ok('podium entries stay anonymous during the countdown',
+   S(host).reveal.podium.every(a => a.author === null && a.real === null));
+ok('still no truth mid-countdown', !seen(host).includes(truth));
+ok('board and phones are in step', S(rest[0]).reveal.stage === S(host).reveal.stage);
+
+// the truth
+await waitFor(() => S(host).reveal.stage >= truthStage, 'the truth', 20000);
+ok('the real answer is revealed', S(host).reveal.truth && S(host).reveal.truth.text === truth);
+ok('it is stamped on screen', /the real answer/i.test(txt(host)));
+ok('authors are named once the truth is out',
+   S(host).reveal.podium.every(a => a.real === true || typeof a.author === 'string'));
+ok('scores still held back', S(host).reveal.scores === null);
+
+// the full breakdown
+await waitFor(() => S(host).reveal.stage >= finalStage, 'the scores', 20000);
 const R = S(host).reveal;
-ok('the truth is marked on the board', /the real answer/i.test(txt(host)));
-ok('podium rendered', R.top3.length > 0);
+ok('every answer is listed at the end', R.answers && R.answers.length === S(host).poolSize);
+ok('scores arrive last', R.scores && R.scores.length === 3);
+ok('exactly one answer is marked true', R.answers.filter(a => a.real).length === 1);
+ok('players see the breakdown too', /Every answer/i.test(txt(rest[0])));
+
 const finderName = S(rest[0]).you.name;
 const stolen = R.answers.find(a => a.author === finderName);
-const expected = 2 + (stolen ? stolen.votes : 0);   // +2 for the truth, +1 per vote their lie stole
+const expected = 2 + (stolen ? stolen.votes : 0);
 const got = R.scores.find(s => s.name === finderName).score;
 ok(`finder scored ${expected} (2 for the truth + ${expected-2} stolen)`, got === expected, 'got ' + got);
 ok('everyone else scored 0', R.scores.filter(s => s.name !== finderName).every(s => s.score === 0));
 ok('points awarded = points explained', R.scores.reduce((n,s)=>n+s.score,0) === expected);
-ok('players see the scoreboard too', /Scores/i.test(txt(rest[0])));
 ok('no duplicate ids on the reveal screen', dupIds(rest[0]).length === 0, dupIds(rest[0]).join());
 
 console.log('\nNEXT ROUND');
